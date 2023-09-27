@@ -12,11 +12,6 @@ var screenWidth: i32 = 800;
 var screenHeight: i32 = 600;
 
 pub fn main() !void {
-    // raylib.SetConfigFlags(raylib.ConfigFlags{ .FLAG_WINDOW_RESIZABLE = true });
-    // raylib.InitWindow(screenWidth, screenHeight, "hello world!");
-    // raylib.SetTargetFPS(60);
-    // defer raylib.CloseWindow();
-
     var points = [_]KDPoint{
         KDPoint{ .value = &.{ 0.0, 5.0 } },
         KDPoint{ .value = &.{ 1.0, -1.0 } },
@@ -43,29 +38,6 @@ pub fn main() !void {
     const node_c = try t.insert(KDPoint{ .value = &.{3.0} });
     _ = node_c;
     _ = t.isEmpty();
-
-    // while (!raylib.WindowShouldClose()) {
-    //     if (raylib.IsWindowResized()) {
-    //         screenWidth = raylib.GetScreenWidth();
-    //         screenHeight = raylib.GetScreenHeight();
-    //     }
-
-    //     const screenXMiddle = @divTrunc(screenWidth, 2);
-    //     const screenYMiddle = @divTrunc(screenHeight, 2);
-
-    //     raylib.BeginDrawing();
-    //     defer raylib.EndDrawing();
-
-    //     raylib.DrawLine(screenXMiddle, 0, screenXMiddle, screenHeight, raylib.GRAY);
-    //     raylib.DrawLine(0, screenYMiddle, screenWidth, screenYMiddle, raylib.GRAY);
-
-    //     for (points) |p| {
-    //         raylib.DrawCircle(@as(i32, @intFromFloat(p.value[0])) + screenXMiddle, screenYMiddle - @as(i32, @intFromFloat(p.value[1])), 3, raylib.RED);
-    //     }
-
-    //     raylib.ClearBackground(raylib.WHITE);
-    //     raylib.DrawFPS(10, 10);
-    // }
 }
 
 test "Insert 1D" {
