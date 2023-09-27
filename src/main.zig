@@ -1,7 +1,7 @@
 const std = @import("std");
 const kdt = @import("kdTree.zig");
 const KDTree = kdt.KDTree;
-const KPoint = kdt.KPoint;
+const KDPoint = kdt.KDPoint;
 
 const raylib = @import("raylib");
 
@@ -17,16 +17,16 @@ pub fn main() !void {
     // raylib.SetTargetFPS(60);
     // defer raylib.CloseWindow();
 
-    var points = [_]KPoint{
-        KPoint{ .value = &.{ 0.0, 5.0 } },
-        KPoint{ .value = &.{ 1.0, -1.0 } },
-        KPoint{ .value = &.{ -1.0, 1.0 } },
-        KPoint{ .value = &.{ -1.0, 6.0 } },
-        KPoint{ .value = &.{ 2.0, -5.0 } },
-        KPoint{ .value = &.{ -0.5, 0.0 } },
+    var points = [_]KDPoint{
+        KDPoint{ .value = &.{ 0.0, 5.0 } },
+        KDPoint{ .value = &.{ 1.0, -1.0 } },
+        KDPoint{ .value = &.{ -1.0, 1.0 } },
+        KDPoint{ .value = &.{ -1.0, 6.0 } },
+        KDPoint{ .value = &.{ 2.0, -5.0 } },
+        KDPoint{ .value = &.{ -0.5, 0.0 } },
     };
     var tree = try KDTree.createBalanced(points[0..], allocator);
-    _ = try tree.insert(KPoint{ .value = &.{ -1.5, -2 } });
+    _ = try tree.insert(KDPoint{ .value = &.{ -1.5, -2 } });
     _ = tree.isEmpty();
     tree.destroy();
 
@@ -34,13 +34,13 @@ pub fn main() !void {
     arena.* = std.heap.ArenaAllocator.init(allocator);
     var t = KDTree{ .root = null, .k = 1, .allocator = arena.allocator(), .arena = arena };
     defer t.destroy();
-    const node_a = try t.insert(KPoint{ .value = &.{0.0} });
+    const node_a = try t.insert(KDPoint{ .value = &.{0.0} });
     _ = node_a;
 
-    const node_b = try t.insert(KPoint{ .value = &.{5.0} });
+    const node_b = try t.insert(KDPoint{ .value = &.{5.0} });
     _ = node_b;
 
-    const node_c = try t.insert(KPoint{ .value = &.{3.0} });
+    const node_c = try t.insert(KDPoint{ .value = &.{3.0} });
     _ = node_c;
     _ = t.isEmpty();
 
@@ -75,19 +75,19 @@ test "Insert 1D" {
 
     var tree = KDTree{ .root = null, .k = 1, .allocator = arena.allocator(), .arena = arena };
     defer tree.destroy();
-    const root = try tree.insert(KPoint{ .value = &.{0.0} });
+    const root = try tree.insert(KDPoint{ .value = &.{0.0} });
     try std.testing.expectEqualSlices(f32, &.{0.0}, root.point.value);
     try std.testing.expectEqual(@as(u32, 0), root.direction);
 
-    _ = try tree.insert(KPoint { .value = &.{ 5.0 } });
+    _ = try tree.insert(KDPoint { .value = &.{ 5.0 } });
     try std.testing.expectEqualSlices(f32, &.{ 5.0 }, root.right_child.?.point.value);
     try std.testing.expectEqual(@as(u32, 0), root.right_child.?.direction);
 
-    _ = try tree.insert(KPoint { .value = &.{ 3.0 } });
+    _ = try tree.insert(KDPoint { .value = &.{ 3.0 } });
     try std.testing.expectEqualSlices(f32, &.{ 3.0 }, root.right_child.?.left_child.?.point.value);
     try std.testing.expectEqual(@as(u32, 0), root.right_child.?.left_child.?.direction);
 
-    _ = try tree.insert(KPoint { .value = &.{ -1.0 } });
+    _ = try tree.insert(KDPoint { .value = &.{ -1.0 } });
     try std.testing.expectEqualSlices(f32, &.{ -1.0 }, root.left_child.?.point.value);
     try std.testing.expectEqual(@as(u32, 0), root.left_child.?.direction);
 }
@@ -99,32 +99,32 @@ test "Insert 2D" {
 
     var tree = KDTree{ .root = null, .k = 2, .allocator = arena.allocator(), .arena = arena };
     defer tree.destroy();
-    const root = try tree.insert(KPoint{ .value = &.{ 0.0, 0.0 } });
+    const root = try tree.insert(KDPoint{ .value = &.{ 0.0, 0.0 } });
     try std.testing.expectEqualSlices(f32, &.{ 0.0, 0.0 }, root.point.value);
     try std.testing.expectEqual(@as(u32, 0), root.direction);
 
-    _ = try tree.insert(KPoint{ .value = &.{ 5.0, 2.0 } });
+    _ = try tree.insert(KDPoint{ .value = &.{ 5.0, 2.0 } });
     try std.testing.expectEqualSlices(f32, &.{ 5.0, 2.0 }, root.right_child.?.point.value);
     try std.testing.expectEqual(@as(u32, 1), root.right_child.?.direction);
 
-    _ = try tree.insert(KPoint{ .value = &.{ 3.0, 1.0 } });
+    _ = try tree.insert(KDPoint{ .value = &.{ 3.0, 1.0 } });
     try std.testing.expectEqualSlices(f32, &.{ 3.0, 1.0 }, root.right_child.?.left_child.?.point.value);
     try std.testing.expectEqual(@as(u32, 0), root.right_child.?.left_child.?.direction);
 
-    _ = try tree.insert(KPoint{ .value = &.{ -1.0, -3.0 } });
+    _ = try tree.insert(KDPoint{ .value = &.{ -1.0, -3.0 } });
     try std.testing.expectEqualSlices(f32, &.{ -1.0, -3.0 }, root.left_child.?.point.value);
     try std.testing.expectEqual(@as(u32, 1), root.left_child.?.direction);
 }
 
 test "Init Balanced Tree" {
     const testing_allocator = std.testing.allocator;
-    var points = [_]KPoint{
-        KPoint{ .value = &.{ 0.0, 5.0 } },
-        KPoint{ .value = &.{ 1.0, -1.0 } },
-        KPoint{ .value = &.{ -1.0, 6.0 } },
-        KPoint{ .value = &.{ -1.0, 1.0 } },
-        KPoint{ .value = &.{ 2.0, -5.0 } },
-        KPoint{ .value = &.{ -0.5, 0.0 } },
+    var points = [_]KDPoint{
+        KDPoint{ .value = &.{ 0.0, 5.0 } },
+        KDPoint{ .value = &.{ 1.0, -1.0 } },
+        KDPoint{ .value = &.{ -1.0, 6.0 } },
+        KDPoint{ .value = &.{ -1.0, 1.0 } },
+        KDPoint{ .value = &.{ 2.0, -5.0 } },
+        KDPoint{ .value = &.{ -0.5, 0.0 } },
     };
     var tree = try KDTree.createBalanced(points[0..], testing_allocator);
     defer tree.destroy();
@@ -146,4 +146,27 @@ test "Init Balanced Tree" {
 
     try std.testing.expectEqualSlices(f32, &.{ -0.5, 0.0 }, tree.root.?.left_child.?.left_child.?.point.value);
     try std.testing.expectEqual(@as(u32, 0), tree.root.?.left_child.?.left_child.?.direction);
+}
+
+test "Search" {
+    const testing_allocator = std.testing.allocator;
+    var points = [_]KDPoint{
+        KDPoint{ .value = &.{ 0.0, 5.0 } },
+        KDPoint{ .value = &.{ 1.0, -1.0 } },
+        KDPoint{ .value = &.{ -1.0, 6.0 } },
+        KDPoint{ .value = &.{ -1.0, 1.0 } },
+        KDPoint{ .value = &.{ 2.0, -5.0 } },
+        KDPoint{ .value = &.{ -0.5, 0.0 } },
+    };
+    var tree = try KDTree.createBalanced(points[0..], testing_allocator);
+    defer tree.destroy();
+
+    var result = tree.search(KDPoint{ .value = &.{ 0.0, 5.0 } });
+    try std.testing.expect(result);
+    result = tree.search(KDPoint{ .value = &.{ 2.0, -5.0 } });
+    try std.testing.expect(result);
+
+    result = tree.search(KDPoint{ .value = &.{ 20.0, -5.0 } });
+    try std.testing.expect(result);
+
 }

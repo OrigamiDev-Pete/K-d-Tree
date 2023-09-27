@@ -1,17 +1,17 @@
 const std = @import("std");
 
 // Represents a k-dimensional point.
-pub const KPoint = struct {
+pub const KDPoint = struct {
     value: []const f32,
 
-    pub fn equals(self: KPoint, other: KPoint) bool {
+    pub fn equals(self: KDPoint, other: KDPoint) bool {
         for (self.value, other.value) |component1, component2| {
             if (component1 != component2) return false;
         }
         return true;
     }
 
-    pub fn kCompare(self: KPoint, other: KPoint, k: u32) f32 {
+    pub fn kCompare(self: KDPoint, other: KDPoint, k: u32) f32 {
         const result = other.value[k] - self.value[k];
         // To improve tree balance we decide whether to favour a direction on equal comparisons by whether the k dimension is odd or even.
         if (result == 0) {
@@ -21,27 +21,27 @@ pub const KPoint = struct {
         }
     }
 
-    pub fn dimensions(self: KPoint) u32 {
+    pub fn dimensions(self: KDPoint) u32 {
         return @intCast(self.value.len);
     }
 };
 
 pub const KBoundingRegion = struct {
-    position: KPoint,
-    size: KPoint,
+    position: KDPoint,
+    size: KDPoint,
 };
 
 const PartitionResult = struct {
-    median: KPoint,
-    left: []KPoint,
-    right: []KPoint,
+    median: KDPoint,
+    left: []KDPoint,
+    right: []KDPoint,
 };
 
 pub const KDTree = struct {
     const KDNode = struct {
         left_child: ?*KDNode = null,
         right_child: ?*KDNode = null,
-        point: KPoint,
+        point: KDPoint,
         // Note(Pete): direction determines the dimension in the hyperspace to use when comparing.
         // Other implementations may store a level and compute the direction based on the dimensionality of the tree.
         direction: u32 = 0,
@@ -52,7 +52,7 @@ pub const KDTree = struct {
     allocator: std.mem.Allocator,
     arena: *std.heap.ArenaAllocator,
 
-    pub fn create(points: []KPoint, allocator: std.mem.Allocator) !KDTree {
+    pub fn create(points: []KDPoint, allocator: std.mem.Allocator) !KDTree {
         var arena = try allocator.create(std.heap.ArenaAllocator);
         arena.* = std.heap.ArenaAllocator.init(allocator);
         var tree = KDTree{ .root = null, .k = points[0].dimensions(), .allocator = arena.allocator(), .arena = arena };
@@ -62,7 +62,7 @@ pub const KDTree = struct {
         return tree;
     }
 
-    pub fn createBalanced(points: []KPoint, allocator: std.mem.Allocator) !KDTree {
+    pub fn createBalanced(points: []KDPoint, allocator: std.mem.Allocator) !KDTree {
         var arena = try allocator.create(std.heap.ArenaAllocator);
         arena.* = std.heap.ArenaAllocator.init(allocator);
         var k: u32 = 0;
@@ -75,7 +75,7 @@ pub const KDTree = struct {
         return tree;
     }
 
-    fn _createBalanced(points: []KPoint, level: u32, k: u32, allocator: std.mem.Allocator) !?*KDNode {
+    fn _createBalanced(points: []KDPoint, level: u32, k: u32, allocator: std.mem.Allocator) !?*KDNode {
         if (points.len == 0) {
             return null;
         } else if (points.len == 1) {
@@ -110,20 +110,20 @@ pub const KDTree = struct {
     /// A median point is found by sorting the points in a given dimension (indicated by level % k). In this
     /// case, the sorting method is insertion which will tend to have a complexity of O(n^2).
     /// Subtrees are allocated by the arena allocator.
-    noinline fn partition(points: []KPoint, level: u32, allocator: std.mem.Allocator) !PartitionResult {
-        const copy = try allocator.dupe(KPoint, points);
+    noinline fn partition(points: []KDPoint, level: u32, allocator: std.mem.Allocator) !PartitionResult {
+        const copy = try allocator.dupe(KDPoint, points);
 
         const Context = struct {
             level: u32,
         };
 
         const k_less_than = struct {
-            fn inner(context: Context, a: KPoint, b: KPoint) bool {
+            fn inner(context: Context, a: KDPoint, b: KDPoint) bool {
                 return a.value[context.level] < b.value[context.level];
             }
         }.inner;
 
-        std.sort.insertion(KPoint, copy, Context{ .level = level }, k_less_than);
+        std.sort.insertion(KDPoint, copy, Context{ .level = level }, k_less_than);
         const middle = copy.len / 2;
         const median = copy[middle];
         const left = copy[0 .. middle];
@@ -140,7 +140,7 @@ pub const KDTree = struct {
         return self.size() == 0;
     }
 
-    pub fn insert(self: *KDTree, point: KPoint) !*KDNode {
+    pub fn insert(self: *KDTree, point: KDPoint) !*KDNode {
         if (self.k == 0) {
             self.k = point.dimensions();
         }
@@ -148,43 +148,53 @@ pub const KDTree = struct {
         return self.root.?;
     }
 
-    fn _insert(self: KDTree, node: ?*KDNode, point: KPoint, direction: u32) !*KDNode {
+    fn _insert(self: KDTree, node: ?*KDNode, point: KDPoint, direction: u32) !*KDNode {
         const newDirection = (direction + 1) % self.k;
         if (node == null) {
             const newNode = try self.allocator.create(KDNode);
             const v = try self.allocator.dupe(f32, point.value);
-            newNode.* = KDNode{ .point = KPoint{ .value = v }, .direction = direction };
+            newNode.* = KDNode{ .point = KDPoint{ .value = v }, .direction = direction };
             return newNode;
         } else if (node.?.point.equals(point)) {
             return node.?;
         } else if (node.?.point.kCompare(point, direction) < 0) {
             const v = try self.allocator.dupe(f32, point.value);
-            node.?.left_child = try self._insert(node.?.left_child, KPoint{ .value = v }, newDirection);
+            node.?.left_child = try self._insert(node.?.left_child, KDPoint{ .value = v }, newDirection);
             return node.?;
         } else {
             const v = try self.allocator.dupe(f32, point.value);
-            node.?.right_child = try self._insert(node.?.right_child, KPoint{ .value = v }, newDirection);
+            node.?.right_child = try self._insert(node.?.right_child, KDPoint{ .value = v }, newDirection);
             return node.?;
         }
     }
 
-    pub fn remove(self: KDTree, point: KPoint) void {
+    pub fn remove(self: KDTree, point: KDPoint) void {
         _ = point;
         _ = self;
     }
 
-    pub fn search(self: KDTree, point: KPoint) bool {
+    pub fn search(self: KDTree, point: KDPoint) bool {
         if (self.root == null)
             return false;
-        return self.root.search(point);
+        return self._search(self.root, point);
     }
 
-    pub fn nearestNeighbour(self: KDTree, point: KPoint) KPoint {
+    fn _search(self: KDTree, node: ?*KDNode, point: KDPoint) bool {
+        if (node == null) return false
+        else if (node.?.point.equals(point)) return true
+        else if (node.?.point.kCompare(point, node.?.direction) < 0) {
+            return self._search(node.?.left_child, point);
+        } else {
+            return self._search(node.?.right_child, point);
+        }
+    }
+
+    pub fn nearestNeighbour(self: KDTree, point: KDPoint) KDPoint {
         _ = point;
         _ = self;
     }
 
-    pub fn pointsInRegion(self: KDTree, region: KBoundingRegion) []KPoint {
+    pub fn pointsInRegion(self: KDTree, region: KBoundingRegion) []KDPoint {
         _ = region;
         _ = self;
     }
