@@ -189,3 +189,49 @@ test "Remove Node With Only Left Child" {
 
     try std.testing.expectEqual(@as(usize, 5), tree.size());
 }
+
+test "Remove Leaf Node" {
+    const testing_allocator = std.testing.allocator;
+    var points = [_]KDPoint{
+        KDPoint{ .value = &.{ 0.0, 5.0 } },
+        KDPoint{ .value = &.{ 1.0, -1.0 } },
+        KDPoint{ .value = &.{ -1.0, 6.0 } },
+        KDPoint{ .value = &.{ -1.0, 1.0 } },
+        KDPoint{ .value = &.{ 2.0, -5.0 } },
+        KDPoint{ .value = &.{ -0.5, 0.0 } },
+    };
+    var tree = try KDTree.createBalanced(points[0..], testing_allocator);
+    defer tree.destroy();
+
+    var result = try tree.remove(KDPoint{ .value = &.{ -1.0, 6.0 } });
+    try std.testing.expect(result);
+
+    result = try tree.remove(KDPoint{ .value = &.{ -1.0, 6.0 } });
+    try std.testing.expect(!result);
+
+    try std.testing.expectEqual(@as(usize, 5), tree.size());
+}
+
+test "Remove Node With Only Right Child" {
+    const testing_allocator = std.testing.allocator;
+    var points = [_]KDPoint{
+        KDPoint{ .value = &.{ 0.0, 5.0 } },
+        KDPoint{ .value = &.{ 1.0, -1.0 } },
+        KDPoint{ .value = &.{ -1.0, 6.0 } },
+        KDPoint{ .value = &.{ -1.0, 1.0 } },
+        KDPoint{ .value = &.{ 2.0, -5.0 } },
+        KDPoint{ .value = &.{ -0.5, 0.0 } },
+    };
+    var tree = try KDTree.createBalanced(points[0..], testing_allocator);
+    defer tree.destroy();
+
+    _ = try tree.insert(KDPoint{ .value = &.{ 3, -2 } });
+
+    var result = try tree.remove(KDPoint{ .value = &.{ 2.0, -5.0 } });
+    try std.testing.expect(result);
+
+    result = try tree.remove(KDPoint{ .value = &.{ 2.0, -5.0 } });
+    try std.testing.expect(!result);
+
+    try std.testing.expectEqual(@as(usize, 6), tree.size());
+}
