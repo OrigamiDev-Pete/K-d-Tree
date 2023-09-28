@@ -23,6 +23,10 @@ pub fn main() !void {
     var tree = try KDTree.createBalanced(points[0..], allocator);
     // _ = try tree.insert(KDPoint{ .value = &.{ -1.5, -2 } });
 
+    var nn = KDPoint{ .value = &.{} };
+    var dist = tree.nearestNeighbour(KDPoint{ .value = &.{ 0.5, 4.5 } }, &nn);
+    _ = dist;
+
     var r = try tree.remove(KDPoint{ .value = &.{ -0.5, 0.0 } });
     r = try tree.remove(KDPoint{ .value = &.{ 0.0, 5.0 } });
     _ = tree.isEmpty();
@@ -54,16 +58,16 @@ test "Insert 1D" {
     try std.testing.expectEqualSlices(f32, &.{0.0}, root.point.value);
     try std.testing.expectEqual(@as(u32, 0), root.direction);
 
-    _ = try tree.insert(KDPoint { .value = &.{ 5.0 } });
-    try std.testing.expectEqualSlices(f32, &.{ 5.0 }, root.right_child.?.point.value);
+    _ = try tree.insert(KDPoint{ .value = &.{5.0} });
+    try std.testing.expectEqualSlices(f32, &.{5.0}, root.right_child.?.point.value);
     try std.testing.expectEqual(@as(u32, 0), root.right_child.?.direction);
 
-    _ = try tree.insert(KDPoint { .value = &.{ 3.0 } });
-    try std.testing.expectEqualSlices(f32, &.{ 3.0 }, root.right_child.?.left_child.?.point.value);
+    _ = try tree.insert(KDPoint{ .value = &.{3.0} });
+    try std.testing.expectEqualSlices(f32, &.{3.0}, root.right_child.?.left_child.?.point.value);
     try std.testing.expectEqual(@as(u32, 0), root.right_child.?.left_child.?.direction);
 
-    _ = try tree.insert(KDPoint { .value = &.{ -1.0 } });
-    try std.testing.expectEqualSlices(f32, &.{ -1.0 }, root.left_child.?.point.value);
+    _ = try tree.insert(KDPoint{ .value = &.{-1.0} });
+    try std.testing.expectEqualSlices(f32, &.{-1.0}, root.left_child.?.point.value);
     try std.testing.expectEqual(@as(u32, 0), root.left_child.?.direction);
 }
 
@@ -234,4 +238,32 @@ test "Remove Node With Only Right Child" {
     try std.testing.expect(!result);
 
     try std.testing.expectEqual(@as(usize, 6), tree.size());
+}
+
+test "Nearest Neighbour" {
+    const testing_allocator = std.testing.allocator;
+    var points = [_]KDPoint{
+        KDPoint{ .value = &.{ 0.0, 5.0 } },
+        KDPoint{ .value = &.{ 1.0, -1.0 } },
+        KDPoint{ .value = &.{ -1.0, 6.0 } },
+        KDPoint{ .value = &.{ -1.0, 1.0 } },
+        KDPoint{ .value = &.{ 2.0, -5.0 } },
+        KDPoint{ .value = &.{ -0.5, 0.0 } },
+    };
+    var tree = try KDTree.createBalanced(points[0..], testing_allocator);
+    defer tree.destroy();
+
+    var nearestPoint: KDPoint = undefined;
+    var distance = tree.nearestNeighbour(KDPoint{ .value = &.{ 0.5, 4.5 } }, &nearestPoint);
+
+    try std.testing.expectEqualSlices(f32, &.{ 0.0, 5.0 }, nearestPoint.value);
+    try std.testing.expectApproxEqRel(@as(f32, 0.7071), distance, @as(f32, 0.001));
+
+    distance = tree.nearestNeighbour(KDPoint{ .value = &.{ 2.5, -5.0 } }, &nearestPoint);
+    try std.testing.expectEqualSlices(f32, &.{ 2.0, -5.0 }, nearestPoint.value);
+    try std.testing.expectApproxEqRel(@as(f32, 0.5), distance, @as(f32, 0.001));
+
+    distance = tree.nearestNeighbour(KDPoint{ .value = &.{ 20.0, 50.0 } }, &nearestPoint);
+    try std.testing.expectEqualSlices(f32, &.{ -1.0, 6.0 }, nearestPoint.value);
+    try std.testing.expectApproxEqRel(@as(f32, 48.7544), distance, @as(f32, 0.001));
 }

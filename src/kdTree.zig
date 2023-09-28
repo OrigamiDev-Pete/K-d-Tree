@@ -253,9 +253,62 @@ pub const KDTree = struct {
         }
     }
 
-    pub fn nearestNeighbour(self: KDTree, point: KDPoint) KDPoint {
-        _ = point;
-        _ = self;
+    const NearestNeighbourResult = struct {
+        distance: f32 = std.math.floatMax(f32),
+        point: ?*KDPoint = null,
+    };
+
+    pub fn nearestNeighbour(self: KDTree, target: KDPoint, nearestPoint: *KDPoint) f32 {
+        var result = NearestNeighbourResult{};
+        self._nearestNeighbour(self.root, target, &result);
+        if (result.point) |p| {
+            nearestPoint.* = p.*;
+        }
+        return result.distance;
+    }
+
+    pub fn _nearestNeighbour(self: KDTree, node: ?*KDNode, target: KDPoint, result: *NearestNeighbourResult) void {
+        if (node) |n| {
+            const dist = distance(n.point, target);
+            if (dist < result.distance) {
+                result.distance = dist;
+                result.point = &n.point;
+            }
+            var close_branch: ?*KDNode = undefined;
+            var far_branch: ?*KDNode = undefined;
+            if (n.point.kCompare(target, n.direction) < 0) {
+                close_branch = n.left_child;
+                far_branch = n.right_child;
+            } else {
+                close_branch = n.right_child;
+                far_branch = n.left_child;
+            }
+            self._nearestNeighbour(close_branch, target, result);
+            // Compare the distance projected onto the split line passing through the points and the distance of the current nearest neighbour.
+            // If the distance is closer then their may be points in the far branch that could be closer to the target.
+            if (std.math.fabs(n.point.kCompare(target, n.direction)) < result.distance) {
+                self._nearestNeighbour(far_branch, target, result);
+            }
+        }
+    }
+
+    fn distanceSquared(a: KDPoint, b: KDPoint) f32 {
+        var d: f32 = 0;
+        for (a.value, b.value) |p1, p2| {
+            const p = p1 - p2;
+            d += p * p;
+        }
+        return d;
+    }
+
+    fn distance(a: KDPoint, b: KDPoint) f32 {
+        return std.math.sqrt(distanceSquared(a, b));
+    }
+
+    fn splitDistance(a: KDPoint, b: KDPoint) f32 {
+        _ = b;
+        _ = a;
+
     }
 
     pub fn pointsInRegion(self: KDTree, region: KBoundingRegion) []KDPoint {
