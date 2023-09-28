@@ -49,9 +49,12 @@ pub const KDTree = struct {
 
     root: ?*KDNode,
     k: u32, // Number of dimensions
+    _size: usize = 0,
     allocator: std.mem.Allocator,
     arena: *std.heap.ArenaAllocator,
 
+    /// Note(Pete): This is the original create function I added when starting out which simply adds the points
+    /// in order. This was left in as a comparison to the preferred createBalanced function.
     pub fn create(points: []KDPoint, allocator: std.mem.Allocator) !KDTree {
         var arena = try allocator.create(std.heap.ArenaAllocator);
         arena.* = std.heap.ArenaAllocator.init(allocator);
@@ -63,6 +66,9 @@ pub const KDTree = struct {
     }
 
     pub fn createBalanced(points: []KDPoint, allocator: std.mem.Allocator) !KDTree {
+        // Note(Pete): The entire tree uses an arena allocator for its allocation strategy. This means that the tree can
+        // allocating cheaply as needed and when the tree is destroyed it can easily deallocate by resetting the arena.
+        // As K-d tree are mutated infrequently after their creation we needn't worry too much about reclaiming memory when we remove individual elements.
         var arena = try allocator.create(std.heap.ArenaAllocator);
         arena.* = std.heap.ArenaAllocator.init(allocator);
         var k: u32 = 0;
@@ -71,6 +77,7 @@ pub const KDTree = struct {
         }
         var tree = KDTree{ .root = null, .k = k, .allocator = arena.allocator(), .arena = arena };
         tree.root = try _createBalanced(points, 0, tree.k, tree.allocator);
+        tree._size = points.len;
 
         return tree;
     }
@@ -83,6 +90,8 @@ pub const KDTree = struct {
             n.* = KDNode{ .point = points[0], .direction = level % k };
             return n;
         } else {
+            // Split the points in to (as near as possible) two even parts in order to distribute the points evenly through the tree
+            // to create a balanced tree. This is important in the creation step because K-d Trees typically do not rebalance themselves once created.
             const result = try partition(points, level % k, allocator);
             const left_tree = try _createBalanced(result.left, level + 1, k, allocator);
             const right_tree = try _createBalanced(result.right, level + 1, k, allocator);
@@ -94,6 +103,7 @@ pub const KDTree = struct {
 
     pub fn destroy(self: *KDTree) void {
         self.arena.deinit();
+        // Note(Pete): The arena's allocator allocated the arena struct itself in th create* functions so we need to remember to deallocate the arena here.
         self.arena.child_allocator.destroy(self.arena);
     }
 
@@ -126,14 +136,13 @@ pub const KDTree = struct {
         std.sort.insertion(KDPoint, copy, Context{ .level = level }, k_less_than);
         const middle = copy.len / 2;
         const median = copy[middle];
-        const left = copy[0 .. middle];
-        const right = copy[middle + 1..];
+        const left = copy[0..middle];
+        const right = copy[middle + 1 ..];
         return .{ .median = median, .left = left, .right = right };
     }
 
-    pub fn size(self: KDTree) u32 {
-        _ = self;
-        return 0;
+    pub fn size(self: KDTree) usize {
+        return self._size;
     }
 
     pub fn isEmpty(self: KDTree) bool {
@@ -148,12 +157,15 @@ pub const KDTree = struct {
         return self.root.?;
     }
 
-    fn _insert(self: KDTree, node: ?*KDNode, point: KDPoint, direction: u32) !*KDNode {
+    /// Recursively move through the tree until we find an empty child where we can insert the new point.
+    /// If the point already exists in the tree then we do not create a duplicate.
+    fn _insert(self: *KDTree, node: ?*KDNode, point: KDPoint, direction: u32) !*KDNode {
         const newDirection = (direction + 1) % self.k;
         if (node == null) {
             const newNode = try self.allocator.create(KDNode);
             const v = try self.allocator.dupe(f32, point.value);
             newNode.* = KDNode{ .point = KDPoint{ .value = v }, .direction = direction };
+            self._size += 1;
             return newNode;
         } else if (node.?.point.equals(point)) {
             return node.?;
@@ -168,9 +180,59 @@ pub const KDTree = struct {
         }
     }
 
-    pub fn remove(self: KDTree, point: KDPoint) void {
-        _ = point;
-        _ = self;
+    const RemoveResult = struct {
+        node: ?*KDNode,
+        removed: bool,
+    };
+
+    pub fn remove(self: *KDTree, point: KDPoint) !bool {
+        const result = try self._remove(self.root, point);
+        if (result.removed) {
+            self.root = result.node;
+            self._size -= 1;
+            return true;
+        } else {
+            return false;
+        }
+
+    }
+
+    fn _remove(self: KDTree, node: ?*KDNode, point: KDPoint) !RemoveResult {
+        if (node) |n| {
+            if (n.point.equals(point)) {
+                // Note(Pete): In order to satisfy the conditions of a K-d Tree after removing an internal node we need to do some shuffling around of nodes.
+                // This is not as simple as with a typical Binary Search Tree as the dimensionality of the nodes impacts where they may be placed.
+                if (n.right_child) |right| {
+                    // Find the minimum node in this dimension that will replace the node we're trying to remove.
+                    const min_node = findMin(right, n.direction);
+                    const r = try self._remove(n.right_child, min_node.?.point);
+                    const new_right = r.node;
+                    const new_node = try self.allocator.create(KDNode);
+                    new_node.* = KDNode{ .left_child = n.left_child, .right_child = new_right, .point = min_node.?.point, .direction = n.direction };
+                    return .{ .node = new_node, .removed = true };
+                } else if (n.left_child) |left| {
+                    // Find the minimum node in this dimension that will replace the node we're trying to remove.
+                    const min_node = findMin(left, n.direction);
+                    const r = try self._remove(left, min_node.?.point);
+                    const new_right = r.node;
+                    const new_node = try self.allocator.create(KDNode);
+                    new_node.* = KDNode{ .right_child = new_right, .point = min_node.?.point, .direction = n.direction };
+                    return .{ .node = new_node, .removed = true };
+                } else {
+                    return .{ .node = null, .removed = true };
+                }
+            } else if (n.point.kCompare(point, n.direction) < 0) {
+                const r = try self._remove(n.left_child, point);
+                n.left_child = r.node;
+                return .{ .node = n, .removed = r.removed };
+            } else {
+                const r = try self._remove(n.right_child, point);
+                n.right_child = r.node;
+                return .{ .node = n, .removed = r.removed };
+            }
+        } else {
+            return .{ .node = null, .removed = false };
+        }
     }
 
     pub fn search(self: KDTree, point: KDPoint) bool {
@@ -180,9 +242,11 @@ pub const KDTree = struct {
     }
 
     fn _search(self: KDTree, node: ?*KDNode, point: KDPoint) bool {
-        if (node == null) return false
-        else if (node.?.point.equals(point)) return true
-        else if (node.?.point.kCompare(point, node.?.direction) < 0) {
+        if (node == null) {
+            return false;
+        } else if (node.?.point.equals(point)) {
+            return true;
+        } else if (node.?.point.kCompare(point, node.?.direction) < 0) {
             return self._search(node.?.left_child, point);
         } else {
             return self._search(node.?.right_child, point);
@@ -197,5 +261,38 @@ pub const KDTree = struct {
     pub fn pointsInRegion(self: KDTree, region: KBoundingRegion) []KDPoint {
         _ = region;
         _ = self;
+    }
+
+    /// Utility function to find the minimum node in a dimension (direction).
+    /// Useful in managing the gymnasctics required to remove a node.
+    fn findMin(node: ?*KDNode, direction: u32) ?*KDNode {
+        if (node) |n| {
+            if (n.direction == direction) {
+                // If the node is in the correct orientation then the minimum could be this node or any of its left children.
+                if (n.left_child == null) {
+                    return n;
+                } else {
+                    return findMin(n.left_child, direction);
+                }
+            } else {
+                // The minimum node could be this one or either if its children.
+                var result = n;
+                if (findMin(n.left_child, direction)) |left_min| {
+                    if (result.point.kCompare(left_min.point, direction) < 0) {
+                        result = left_min;
+                    }
+                }
+
+                if (findMin(n.right_child, direction)) |right_min| {
+                    if (result.point.kCompare(right_min.point, direction) < 0) {
+                        result = right_min;
+                    }
+                }
+
+                return result;
+            }
+        } else {
+            return null;
+        }
     }
 };

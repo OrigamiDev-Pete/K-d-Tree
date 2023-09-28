@@ -21,7 +21,10 @@ pub fn main() !void {
         KDPoint{ .value = &.{ -0.5, 0.0 } },
     };
     var tree = try KDTree.createBalanced(points[0..], allocator);
-    _ = try tree.insert(KDPoint{ .value = &.{ -1.5, -2 } });
+    // _ = try tree.insert(KDPoint{ .value = &.{ -1.5, -2 } });
+
+    var r = try tree.remove(KDPoint{ .value = &.{ -0.5, 0.0 } });
+    r = try tree.remove(KDPoint{ .value = &.{ 0.0, 5.0 } });
     _ = tree.isEmpty();
     tree.destroy();
 
@@ -135,10 +138,54 @@ test "Search" {
 
     var result = tree.search(KDPoint{ .value = &.{ 0.0, 5.0 } });
     try std.testing.expect(result);
+
     result = tree.search(KDPoint{ .value = &.{ 2.0, -5.0 } });
     try std.testing.expect(result);
 
     result = tree.search(KDPoint{ .value = &.{ 20.0, -5.0 } });
+    try std.testing.expect(!result);
+}
+
+test "Remove Root Node" {
+    const testing_allocator = std.testing.allocator;
+    var points = [_]KDPoint{
+        KDPoint{ .value = &.{ 0.0, 5.0 } },
+        KDPoint{ .value = &.{ 1.0, -1.0 } },
+        KDPoint{ .value = &.{ -1.0, 6.0 } },
+        KDPoint{ .value = &.{ -1.0, 1.0 } },
+        KDPoint{ .value = &.{ 2.0, -5.0 } },
+        KDPoint{ .value = &.{ -0.5, 0.0 } },
+    };
+    var tree = try KDTree.createBalanced(points[0..], testing_allocator);
+    defer tree.destroy();
+
+    var result = try tree.remove(KDPoint{ .value = &.{ 0.0, 5.0 } });
     try std.testing.expect(result);
 
+    result = try tree.remove(KDPoint{ .value = &.{ 0.0, 5.0 } });
+    try std.testing.expect(!result);
+
+    try std.testing.expectEqual(@as(usize, 5), tree.size());
+}
+
+test "Remove Node With Only Left Child" {
+    const testing_allocator = std.testing.allocator;
+    var points = [_]KDPoint{
+        KDPoint{ .value = &.{ 0.0, 5.0 } },
+        KDPoint{ .value = &.{ 1.0, -1.0 } },
+        KDPoint{ .value = &.{ -1.0, 6.0 } },
+        KDPoint{ .value = &.{ -1.0, 1.0 } },
+        KDPoint{ .value = &.{ 2.0, -5.0 } },
+        KDPoint{ .value = &.{ -0.5, 0.0 } },
+    };
+    var tree = try KDTree.createBalanced(points[0..], testing_allocator);
+    defer tree.destroy();
+
+    var result = try tree.remove(KDPoint{ .value = &.{ 1.0, -1.0 } });
+    try std.testing.expect(result);
+
+    result = try tree.remove(KDPoint{ .value = &.{ 1.0, -1.0 } });
+    try std.testing.expect(!result);
+
+    try std.testing.expectEqual(@as(usize, 5), tree.size());
 }
