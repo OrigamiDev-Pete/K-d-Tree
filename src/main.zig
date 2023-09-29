@@ -3,15 +3,11 @@ const kdt = @import("kdTree.zig");
 const KDTree = kdt.KDTree;
 const KDPoint = kdt.KDPoint;
 
-const raylib = @import("raylib");
-
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 
-var screenWidth: i32 = 800;
-var screenHeight: i32 = 600;
-
 pub fn main() !void {
+    // Some example usage. Refer to tests for more complete examples.
     var points = [_]KDPoint{
         KDPoint{ .value = &.{ 0.0, 5.0 } },
         KDPoint{ .value = &.{ 1.0, -1.0 } },
@@ -21,7 +17,8 @@ pub fn main() !void {
         KDPoint{ .value = &.{ -0.5, 0.0 } },
     };
     var tree = try KDTree.createBalanced(points[0..], allocator);
-    // _ = try tree.insert(KDPoint{ .value = &.{ -1.5, -2 } });
+    defer tree.destroy();
+    _ = try tree.insert(KDPoint{ .value = &.{ -1.5, -2 } });
 
     var nn: KDPoint = undefined;
     var dist = tree.nearestNeighbour(KDPoint{ .value = &.{ 0.5, 4.5 } }, &nn);
@@ -33,21 +30,6 @@ pub fn main() !void {
     var r = try tree.remove(KDPoint{ .value = &.{ -0.5, 0.0 } });
     r = try tree.remove(KDPoint{ .value = &.{ 0.0, 5.0 } });
     _ = tree.isEmpty();
-    tree.destroy();
-
-    var arena = try allocator.create(std.heap.ArenaAllocator);
-    arena.* = std.heap.ArenaAllocator.init(allocator);
-    var t = KDTree{ .root = null, .k = 1, .allocator = arena.allocator(), .arena = arena };
-    defer t.destroy();
-    const node_a = try t.insert(KDPoint{ .value = &.{0.0} });
-    _ = node_a;
-
-    const node_b = try t.insert(KDPoint{ .value = &.{5.0} });
-    _ = node_b;
-
-    const node_c = try t.insert(KDPoint{ .value = &.{3.0} });
-    _ = node_c;
-    _ = t.isEmpty();
 }
 
 test "Insert 1D" {

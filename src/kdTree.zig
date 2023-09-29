@@ -37,6 +37,7 @@ const PartitionResult = struct {
     right: []KDPoint,
 };
 
+/// Based on Marcello La Rocca's psuedo-code from Advanced Algorithms and Data Structures (2021), Manning.
 pub const KDTree = struct {
     const KDNode = struct {
         left_child: ?*KDNode = null,
@@ -103,7 +104,7 @@ pub const KDTree = struct {
 
     pub fn destroy(self: *KDTree) void {
         self.arena.deinit();
-        // Note(Pete): The arena's allocator allocated the arena struct itself in th create* functions so we need to remember to deallocate the arena here.
+        // Note(Pete): The arena's allocator allocated the arena struct itself in the create* functions so we need to remember to deallocate the arena here.
         self.arena.child_allocator.destroy(self.arena);
     }
 
@@ -339,7 +340,7 @@ pub const KDTree = struct {
             try self._nNearestNeighbours(far_branch, target, priorityQueue);
         }
     }
-    
+
     fn distanceSquared(a: KDPoint, b: KDPoint) f32 {
         var d: f32 = 0;
         for (a.value, b.value) |p1, p2| {
