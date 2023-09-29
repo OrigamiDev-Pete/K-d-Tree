@@ -23,9 +23,12 @@ pub fn main() !void {
     var tree = try KDTree.createBalanced(points[0..], allocator);
     // _ = try tree.insert(KDPoint{ .value = &.{ -1.5, -2 } });
 
-    var nn = KDPoint{ .value = &.{} };
+    var nn: KDPoint = undefined;
     var dist = tree.nearestNeighbour(KDPoint{ .value = &.{ 0.5, 4.5 } }, &nn);
     _ = dist;
+
+    var nnn = try tree.nNearestNeighbours(KDPoint{ .value = &.{ 0.5, 4.5 } }, 5, allocator);
+    defer allocator.free(nnn);
 
     var r = try tree.remove(KDPoint{ .value = &.{ -0.5, 0.0 } });
     r = try tree.remove(KDPoint{ .value = &.{ 0.0, 5.0 } });
@@ -253,17 +256,43 @@ test "Nearest Neighbour" {
     var tree = try KDTree.createBalanced(points[0..], testing_allocator);
     defer tree.destroy();
 
-    var nearestPoint: KDPoint = undefined;
-    var distance = tree.nearestNeighbour(KDPoint{ .value = &.{ 0.5, 4.5 } }, &nearestPoint);
+    var nearest_point: KDPoint = undefined;
+    var distance = tree.nearestNeighbour(KDPoint{ .value = &.{ 0.5, 4.5 } }, &nearest_point);
 
-    try std.testing.expectEqualSlices(f32, &.{ 0.0, 5.0 }, nearestPoint.value);
+    try std.testing.expectEqualSlices(f32, &.{ 0.0, 5.0 }, nearest_point.value);
     try std.testing.expectApproxEqRel(@as(f32, 0.7071), distance, @as(f32, 0.001));
 
-    distance = tree.nearestNeighbour(KDPoint{ .value = &.{ 2.5, -5.0 } }, &nearestPoint);
-    try std.testing.expectEqualSlices(f32, &.{ 2.0, -5.0 }, nearestPoint.value);
+    distance = tree.nearestNeighbour(KDPoint{ .value = &.{ 2.5, -5.0 } }, &nearest_point);
+    try std.testing.expectEqualSlices(f32, &.{ 2.0, -5.0 }, nearest_point.value);
     try std.testing.expectApproxEqRel(@as(f32, 0.5), distance, @as(f32, 0.001));
 
-    distance = tree.nearestNeighbour(KDPoint{ .value = &.{ 20.0, 50.0 } }, &nearestPoint);
-    try std.testing.expectEqualSlices(f32, &.{ -1.0, 6.0 }, nearestPoint.value);
+    distance = tree.nearestNeighbour(KDPoint{ .value = &.{ 20.0, 50.0 } }, &nearest_point);
+    try std.testing.expectEqualSlices(f32, &.{ -1.0, 6.0 }, nearest_point.value);
     try std.testing.expectApproxEqRel(@as(f32, 48.7544), distance, @as(f32, 0.001));
+}
+
+test "N Nearest Neighbours" {
+    const testing_allocator = std.testing.allocator;
+    var points = [_]KDPoint{
+        KDPoint{ .value = &.{ 0.0, 5.0 } },
+        KDPoint{ .value = &.{ 1.0, -1.0 } },
+        KDPoint{ .value = &.{ -1.0, 6.0 } },
+        KDPoint{ .value = &.{ -1.0, 1.0 } },
+        KDPoint{ .value = &.{ 2.0, -5.0 } },
+        KDPoint{ .value = &.{ -0.5, 0.0 } },
+    };
+    var tree = try KDTree.createBalanced(points[0..], testing_allocator);
+    defer tree.destroy();
+
+    const nearest_neighbours = try tree.nNearestNeighbours(KDPoint{ .value = &.{ 0.5, 4.5 } }, 3, testing_allocator);
+    defer testing_allocator.free(nearest_neighbours);
+
+    try std.testing.expectEqualSlices(f32, &.{ 0.0, 5.0 }, nearest_neighbours[0].point.?.value);
+    try std.testing.expectApproxEqRel(@as(f32, 0.7071), nearest_neighbours[0].distance, @as(f32, 0.001));
+
+    try std.testing.expectEqualSlices(f32, &.{ -1.0, 6.0 }, nearest_neighbours[1].point.?.value);
+    try std.testing.expectApproxEqRel(@as(f32, 2.121), nearest_neighbours[1].distance, @as(f32, 0.001));
+
+    try std.testing.expectEqualSlices(f32, &.{ -1.0, 1.0 }, nearest_neighbours[2].point.?.value);
+    try std.testing.expectApproxEqRel(@as(f32, 3.807), nearest_neighbours[2].distance, @as(f32, 0.001));
 }

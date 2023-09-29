@@ -194,7 +194,6 @@ pub const KDTree = struct {
         } else {
             return false;
         }
-
     }
 
     fn _remove(self: KDTree, node: ?*KDNode, point: KDPoint) !RemoveResult {
@@ -256,7 +255,56 @@ pub const KDTree = struct {
     const NearestNeighbourResult = struct {
         distance: f32 = std.math.floatMax(f32),
         point: ?*KDPoint = null,
+
+        fn compare(_: void, a: NearestNeighbourResult, b: NearestNeighbourResult) std.math.Order {
+            if (std.math.approxEqRel(f32, a.distance, b.distance, 0.01)) {
+                return std.math.Order.eq;
+            } else if (a.distance < b.distance) {
+                return std.math.Order.lt;
+            } else {
+                return std.math.Order.gt;
+            }
+        }
     };
+
+    /// Returns a slice of the n nearest points. The points are ordered from nearest to farthest.
+    /// Ownership of the slice is returned to the caller.
+    pub fn nNearestNeighbours(self: KDTree, target: KDPoint, n: u32, allocator: std.mem.Allocator) ![]NearestNeighbourResult {
+        std.debug.assert(n <= self._size);
+        // A Priority Queue will keep the points in order from nearest to farthest as we add them to the queue. 
+        var priorityQueue = std.PriorityQueue(NearestNeighbourResult, void, NearestNeighbourResult.compare).init(allocator, {});
+        defer priorityQueue.deinit();
+        try self._nNearestNeighbours(self.root, target, &priorityQueue);
+
+        const nearest_neighbours = try allocator.alloc(NearestNeighbourResult, n);
+        var i: u32 = 0;
+        while (i < n and priorityQueue.count() > 0) {
+            nearest_neighbours[i] = priorityQueue.remove();
+            i += 1;
+        }
+        return nearest_neighbours;
+    }
+
+    fn _nNearestNeighbours(self: KDTree, node: ?*KDNode, target: KDPoint, priorityQueue: *std.PriorityQueue(NearestNeighbourResult, void, NearestNeighbourResult.compare)) !void {
+        const n = node orelse return;
+
+        const dist = distance(n.point, target);
+        try priorityQueue.add(NearestNeighbourResult{ .distance = dist, .point = &n.point });
+        var close_branch: ?*KDNode = undefined;
+        var far_branch: ?*KDNode = undefined;
+        if (n.point.kCompare(target, n.direction) < 0) {
+            close_branch = n.left_child;
+            far_branch = n.right_child;
+        } else {
+            close_branch = n.right_child;
+            far_branch = n.left_child;
+        }
+        try self._nNearestNeighbours(close_branch, target, priorityQueue);
+        const nearest_distance = priorityQueue.peek().?.distance;
+        if (std.math.fabs(n.point.kCompare(target, n.direction)) < nearest_distance) {
+            try self._nNearestNeighbours(far_branch, target, priorityQueue);
+        }
+    }
 
     pub fn nearestNeighbour(self: KDTree, target: KDPoint, nearestPoint: *KDPoint) f32 {
         var result = NearestNeighbourResult{};
@@ -267,7 +315,7 @@ pub const KDTree = struct {
         return result.distance;
     }
 
-    pub fn _nearestNeighbour(self: KDTree, node: ?*KDNode, target: KDPoint, result: *NearestNeighbourResult) void {
+    fn _nearestNeighbour(self: KDTree, node: ?*KDNode, target: KDPoint, result: *NearestNeighbourResult) void {
         if (node) |n| {
             const dist = distance(n.point, target);
             if (dist < result.distance) {
@@ -308,7 +356,6 @@ pub const KDTree = struct {
     fn splitDistance(a: KDPoint, b: KDPoint) f32 {
         _ = b;
         _ = a;
-
     }
 
     pub fn pointsInRegion(self: KDTree, region: KBoundingRegion) []KDPoint {
