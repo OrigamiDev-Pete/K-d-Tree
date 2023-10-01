@@ -1,0 +1,22 @@
+# K-d Tree
+Peter de Vroom - 13294196
+
+## Building
+To build the project you will need the latest version of [Zig (v0.11.0)](https://ziglang.org/download/). Once Zig is install, simply run:
+```sh
+zig build
+```
+This produces an executable in the `zig-out/bin` directory.
+
+You can also immediately run the built executable by running:
+```sh
+zig build run
+```
+The program itself doesn't produce any interesting outputs, but will create a tree, perform some operations, then exit. Refer to the tests for more thourough coverage.
+
+## Tests
+Zig has a built in testing framework. To invoke the tests for this project, run:
+```sh
+zig test ./src/main.zig # Adjust the path as necessary
+```
+All being well, the output should say, `All 10 tests passed`.
